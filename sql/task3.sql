@@ -61,21 +61,29 @@ WHERE P.price = MPC.max_price;
 -- The result should include the user ID and username.
 -- Hint: You may need to use subqueries, joins, and window functions to solve this problem.
 
-SELECT DISTINCT U.user_id, U.username
-FROM Users U
-JOIN Orders O1 ON U.user_id = O1.user_id
-WHERE EXISTS (
+WITH ConsecutiveOrders AS (
+    SELECT
+        o.user_id,
+        o.order_date,
+        LEAD(o.order_date) OVER (PARTITION BY o.user_id ORDER BY o.order_date) as next_order_date
+    FROM Orders o
+)
+SELECT DISTINCT
+    u.user_id,
+    u.username
+FROM Users u
+JOIN ConsecutiveOrders co ON u.user_id = co.user_id
+WHERE DATEDIFF(co.next_order_date, co.order_date) = 1
+AND EXISTS (
     SELECT 1
-    FROM Orders O2
-    JOIN Orders O3 ON O2.user_id = O3.user_id
-    WHERE O1.user_id = O2.user_id
+    FROM ConsecutiveOrders co2
+    WHERE co2.user_id = co.user_id
     AND (
-        (O2.order_date = DATE_ADD(O1.order_date, INTERVAL 1 DAY) AND O3.order_date = DATE_ADD(O2.order_date, INTERVAL 1 DAY))
-        OR (O2.order_date = DATE_ADD(O1.order_date, INTERVAL 1 DAY) AND O3.order_date = DATE_ADD(O1.order_date, INTERVAL 2 DAY))
-        OR (O1.order_date = DATE_ADD(O2.order_date, INTERVAL 1 DAY) AND O3.order_date = DATE_ADD(O1.order_date, INTERVAL 1 DAY))
-        OR (O1.order_date = DATE_ADD(O2.order_date, INTERVAL 1 DAY) AND O3.order_date = DATE_ADD(O2.order_date, INTERVAL 2 DAY))
+        DATEDIFF(co2.order_date, co.order_date) = 2
+        OR DATEDIFF(co2.order_date, co.order_date) = -2
     )
 );
+
 
 
 
